@@ -1,0 +1,7 @@
+/vid
+/vid.exe
+/dist/
+*.test
+*.out
+.idea/
+*.exe~
