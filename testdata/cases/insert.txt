@@ -1,0 +1,31 @@
+# i inserts before the cursor; <Esc> steps back one
+text:  ‸
+keys:  ihello<Esc>
+want:  hell‸o
+
+# the owner's first example: arrows, <Del> and <Insert> in normal mode
+text:  ‸
+keys:  ihello<Esc><Left><Left><Del><Insert>LL<Esc>
+want:  heL‸Llo
+reg:   " c l
+
+# a appends after the cursor
+text:  ‸ac
+keys:  ab<Esc>
+want:  a‸bc
+
+# A appends at the end of the line
+text:  ‸foo
+keys:  A bar<Esc>
+want:  foo ba‸r
+
+# I inserts before the first non-blank
+text:  ␠␠fo‸o
+keys:  I-<Esc>
+want:  ␠␠‸-foo
+
+# <Left> in insert mode stays in insert mode
+text:  ‸ab
+keys:  A<Left>X
+want:  aX‸b
+mode:  insert

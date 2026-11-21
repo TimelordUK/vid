@@ -353,7 +353,24 @@ mode:  normal
   **Agreed (2026-11-21):** not `|`, which jq and pwsh text is full of. A file may override
   with `marker:`. Typing `‸` is rarely needed: most cases come from `-update` or the smoke
   host's F9.
-- Optional lines: `mode:`, `reg:`, `msg:`, `events:`, `profile:`, `keymap:`.
+- `keys:` is vim's key notation (`ihello<Esc><Left><Del>`), exactly as nvim's `nvim_input`
+  takes it and as vid's `key` package parses it: one spec, read by both engines, with no
+  translation between them.
+- Multi-line text is a block under the field, each line indented by exactly four spaces.
+  Inside a value, `␠` is a space (written only where editors lose them, at the ends), `⇥`
+  a tab, `␤` a newline.
+- `mode:` is written only when it is not `normal`; `reg:` is the register's name, its type
+  (`c` charwise, `l` linewise, `b` blockwise) and its content: `reg: " l two␤`.
+- Optional lines: `mode:`, `reg:`, and later `msg:`, `events:`, `profile:`, `keymap:`,
+  `ext:`.
+- The files are kept in canonical form (a test checks), so a bless rewrites only what it
+  was asked to.
+- **The spec is checked from both sides** (built 2026-11-21): the oracle proves each case
+  says what nvim does; the engine tests prove vid does what each case says. So vid agrees
+  with nvim on every case not tagged `oracle: skip`. In the oracle module,
+  `go test -bless` writes `want:`, `mode:` and `reg:` contents from nvim: write the
+  `text:` and `keys:`, let nvim answer, review the diff. The first run caught three wrong
+  answers written from memory, one of them nvim's `nostartofline`.
 - Tags: `# oracle: skip — why` for cases where vid deliberately differs from vim (all of
   them listed in §9), `# psreadline` for cases that pin a PSReadLine behaviour.
 - `go test ./... -update` re-blesses `want:` lines from the engine; review the diff before
@@ -374,7 +391,15 @@ fails the test with both results. Without nvim the oracle tests skip; CI install
   gives them: `Y` is `y$`, `nostartofline`, `nojoinspaces`, and so on. vid follows those.
 - **One `nvim --embed --clean` per test run**, driven over msgpack-RPC, buffer reset between
   cases; not a process per case. It lives in its own module (`oracle`) so the core's
-  `go.mod` never carries the RPC client.
+  `go.mod` never carries the RPC client. Measured on the owner's machine (2026-11-21):
+  nvim starts in 0.22 s clean against 3.6 s with the owner's config, and a case costs
+  about 0.7 ms on the shared nvim.
+- **Keys go in through `nvim_input`**, as nvim's own functional tests feed them, and the
+  state is read by a following request. `nvim_feedkeys` with `x` sits waiting when a case
+  ends in insert mode. Stable over 50 back-to-back runs.
+- **Reset between cases:** a new buffer (undo, marks, changelist), the registers, the last
+  search, the last `f`/`t`, the jumplist. Not reset: what `.` repeats and the `.`
+  register. A case that needs those untouched would need a fresh nvim (Q-010).
 - **The owner's own config and plugins never matter**: the oracle always starts clean.
 - **Extensions are checked against the plugin they come from** (§14.3): the case file names
   a plugin pinned at a commit, and the oracle loads that one plugin through a tiny init file,

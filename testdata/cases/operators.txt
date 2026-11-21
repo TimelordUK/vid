@@ -1,0 +1,41 @@
+# dw from the middle of a word deletes to the start of the next
+text:  foo b‸ar baz
+keys:  dw
+want:  foo b‸baz
+reg:   " c ar␠
+
+# a count on both sides multiplies
+text:  ‸a b c d e f g
+keys:  2d2w
+want:  ‸e f g
+
+# cw on a word acts as ce: the space after it stays
+text:  ‸foo bar
+keys:  cwX<Esc>
+want:  ‸X bar
+
+# dw on the last word of a line does not join the next line
+text:
+    foo ‸bar
+    baz
+keys:  dw
+want:
+    foo‸␠
+    baz
+
+# x at the end of the line steps the cursor back
+text:  ab‸c
+keys:  x
+want:  a‸b
+reg:   " c c
+
+# ciw on whitespace changes the whitespace (vim's rule)
+text:  foo ‸   bar
+keys:  ciwX<Esc>
+want:  foo‸Xbar
+
+# Y yanks to the end of the line: nvim's default, not vim's
+text:  foo ‸bar
+keys:  Y
+want:  foo ‸bar
+reg:   " c bar

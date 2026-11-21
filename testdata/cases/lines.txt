@@ -1,0 +1,35 @@
+# dd keeps the column on the next line: nvim's nostartofline, not vim's first non-blank
+text:
+    one
+    t‸wo
+    three
+keys:  dd
+want:
+    one
+    t‸hree
+reg:   " l two␤
+
+# yyp puts a copy below and lands on it
+text:
+    ‸one
+    two
+keys:  yyp
+want:
+    one
+    ‸one
+    two
+
+# J joins with one space and lands on it
+text:
+    ‸foo
+    ␠␠bar
+keys:  J
+want:  foo‸ bar
+
+# o opens a line below in insert mode
+text:  ‸foo
+keys:  obar
+want:
+    foo
+    bar‸
+mode:  insert

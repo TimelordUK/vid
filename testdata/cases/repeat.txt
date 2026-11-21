@@ -1,0 +1,14 @@
+# . repeats the last change
+text:  ‸a b c d e f
+keys:  dw.
+want:  ‸c d e f
+
+# a count before . replaces the change's own count
+text:  ‸a b c d e f g
+keys:  2dw3.
+want:  ‸f g
+
+# u undoes an insert session as one step, cursor back where it began
+text:  foo ‸bar
+keys:  iX<Esc>aYZ<Esc>u
+want:  foo X‸bar
