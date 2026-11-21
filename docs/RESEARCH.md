@@ -51,6 +51,10 @@ jqv's example programs, and the tree-sitter provider stays inside the key budget
 
 ## 2. Hosting vid as a shell's line editor
 
+**Decided (2026-11-21):** option B below, hit's resident pattern, with keys never crossing
+the pipe; the design is now DESIGN §16 and the spike H-012. `vid edit` (2.1) stays an idea
+for zsh, no longer the pwsh story. The notes below are kept as the reasoning.
+
 The ladder, cheapest and safest first. Each rung is useful alone.
 
 ### 2.1 `vid edit` behind a key (no risk)
@@ -103,7 +107,7 @@ its cost. Parked until there's a Linux user asking.
 - **Cursor shape per mode** (DECSCUSR: bar in insert, block in normal): which terminals honour
   it (Windows Terminal does; Zellij passes it through?). A host concern, but the smoke host
   should show it.
-- **The nvim oracle's cost:** one `nvim --headless` per case is slow; one nvim kept alive over
-  `--embed` and msgpack-RPC for a whole test run may be needed. Spike in step 0.
+- **The nvim oracle's cost:** decided (2026-11-21): one `nvim --embed` for a whole test run
+  over msgpack-RPC, not a process per case (DESIGN §8.2, Q-002).
 - **Kitty keyboard protocol** (Bubble Tea v2, jqv T-028): would give shift+enter and ctrl+i vs
   tab. Matters for insert-mode bindings, not for normal mode.

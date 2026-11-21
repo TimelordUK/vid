@@ -5,8 +5,15 @@
 > terminal and no renderer of its own. Any Go program can host it; jqv is the first.
 
 This is a living document. Settled decisions are stated plainly; open questions are marked
-**OPEN** and tracked in [WISHLIST.md](WISHLIST.md). Everything below is a **proposal
-(2026-11-19)** until the owner agrees it section by section, as in jqv and hit.
+**OPEN** and tracked in [WISHLIST.md](WISHLIST.md). Written as a **proposal (2026-11-19)**,
+agreed section by section, as in jqv and hit.
+
+**Agreed with the owner (2026-11-21):** the open questions of §5.3, §5.4, §7, §8.1 and
+§8.2 as now written; `Y` is `y$`; extensions as encapsulated, switchable, separately tested
+packages (§14); jqv first, its REPL and then its code pane, with the basics of language
+services done well (§15); hosting in pwsh through a resident process, hit's pattern (§16).
+**Still proposal:** the multi-line editing feel in pwsh (§16.3) — the owner wants to try it
+before agreeing it; and everything not named here.
 
 ---
 
@@ -52,6 +59,10 @@ vi mode … with no renderer of its own), which would carry over to the TUI's co
 7. **Plain Go, no cgo in the core.** `go install` works everywhere Go does, as jqv and hit
    do. Anything heavier (tree-sitter) is an optional, separate module.
 8. **Not a vim port.** See §3. When in doubt, leave it out until use asks for it.
+9. **Extras are extensions, not engine.** Anything beyond vi's own grammar (surround, jump
+   labels, syntax text objects) is an extension: its own package, its own cases, off unless
+   the host turns it on, and reaching the engine only through the extension API (§14). The
+   engine's own text objects use the same API, so it stays honest.
 
 ## 3. Scope
 
@@ -71,7 +82,13 @@ vi mode … with no renderer of its own), which would carry over to the TUI's co
 - **Keymaps as data:** every binding is a table entry per mode. Hosts add their own named
   actions (`jqv.help`, `jqv.run-to-cursor`) and bind them in the same table.
 - **Hooks for the host:** history, completion, accept/continue, clipboard, colour spans,
-  syntax tree, word definition, notifications (§6.2).
+  syntax tree, word definition, notifications (§6.2), and language services — format,
+  definitions, symbols, diagnostics — that a host answers from what it knows (§15).
+- **A viewport:** the host tells vid which lines are visible (`SetViewport(top, height)`),
+  so `H M L`, `ctrl+d`/`ctrl+u`, `zz zt zb` and jump labels work; vid scrolls it and the
+  host follows.
+- **Extensions** (§14): surround, jump labels, more text objects, syntax objects, each
+  switchable.
 - **A smoke host** (`cmd/vid`) that drives the engine interactively and from scripts, for
   testing and for trying bindings out (§7).
 - **A test kit** (`vidtest`) that hosts reuse, so jqv's tests speak the same case format.
@@ -84,12 +101,13 @@ asks for it.
 | Not | Why |
 |---|---|
 | A vim / nvim clone or port | We replicate vi *editing*, not vim the program |
-| Vimscript, Lua, any scripting or plugin language | The host is the extension mechanism; it's Go |
+| Vimscript, Lua, any scripting or plugin language | Extensions are Go packages ported from a plugin's *idea* (§14), not loaded code |
+| An IDE or script debugger | VS Code is about as good as a pwsh editor and debugger gets; a 20-line script belongs there. vid is for the complex statement and the small program in a pane |
 | Ex command language (`:s`, `:g`, ranges, `:normal`) | `:` belongs to the host (jqv has its own `:` commands). A tiny, host-routed subset may come later (V-wishlist) |
 | Windows, splits, tabs, a buffer list | One buffer per editor; a host with several panes holds several editors |
 | File I/O, encodings, `:w`, swap files | The host owns persistence |
 | Rendering, scrolling, a terminal | The host draws. vid gives text, cursor, selection, mode and spans; an *optional* reference renderer exists for the smoke host |
-| An LSP client | A host can be one and feed completion and diagnostics through hooks |
+| An LSP client | Language services come through hooks the host answers (§15); a host may be an LSP client behind them, vid is not |
 | Folding, multi-cursor, undo tree, macros (`q`) | Not at first; wishlist ideas, judged by use |
 | Mouse | Not at first; a host can map mouse to cursor moves itself |
 | Owning the event loop | vid is fed keys; it never reads input |
@@ -127,9 +145,9 @@ Stages, each useful alone (detail in §11):
 2. jqv's REPL with `[editor] mode = "vi"` (jqv Q-051), then the TUI code pane (jqv T-029).
 3. What PSReadLine and zsh lack: visual mode, surround, more text objects; syntax-aware
    text objects and motions (jq first, through `jqsyntax`; then tree-sitter).
-4. Hosting in shells: first `vid edit` (edit the current line in vid and hand it back, as
-   PSReadLine's `v` does with `$EDITOR`), then experiments in replacing the line editor
-   itself (pwsh's `PSConsoleHostReadLine`) — research, not a promise ([RESEARCH.md](RESEARCH.md) §2).
+4. Hosting in pwsh: vid as the line editor itself, behind `PSConsoleHostReadLine`, run by
+   a resident process (§16). The riskiest part, so a spike comes early (§11 step 0) even
+   though the host is built late.
 
 ## 5. Architecture
 
@@ -147,14 +165,19 @@ them; internals stay in `internal/`.
 | `syntax` | `Tree` and `Node` interfaces: kinds and spans, nothing language-specific | `text` |
 | `keymap` | Tables per mode; the default maps (`PSReadLine`, `ZshViMode`, `Vim`); host actions | `key` |
 | `vid` (root) | `Editor`: modes, the grammar, registers, undo, dot-repeat, hooks, events, state | all above |
-| `render` | Optional reference renderer: state + spans → lines of text with a cursor, in ANSI or markers | `vid` |
+| `ext/*` | Extensions (§14): `ext/surround`, `ext/jump`, `ext/syntaxobj`, … each on its own | `vid` (extension API only) |
+| `render` | Renderer: state + spans → lines of text with a cursor, in ANSI or markers. Inline and multi-line, soft wrap, a scrolling region; a real component for the pwsh host (§16), not just the smoke host's | `vid` |
 | `adapt/teav1` | Bubble Tea v1: `tea.KeyMsg` → `key.Key`; a `tea.Model` wrapping an `Editor` | `vid`, bubbletea v1 |
 | `vidtest` | The case-file runner and helpers, exported so hosts test with it | `vid` |
-| `cmd/vid` | The smoke host (§7) | everything |
+| `cmd/vid` | The smoke host (§7), and `vid serve`, the resident line editor for pwsh (§16) | everything |
+| `oracle` (own module) | The nvim oracle: one `nvim --embed` over msgpack-RPC, plugin pins (§8.2) | test-only |
 
 Only `adapt/*` and `cmd/vid` import a terminal library. The tree-sitter provider, if it
 lands, lives in its own module (`vid/syntax/treesitter`, own `go.mod`) so the core's
-dependency list never grows for those who don't want it.
+dependency list never grows for those who don't want it; so does the oracle.
+
+State and events are **plain data** — no functions or channels in them — so they can be
+serialised. A host in another language, or across a pipe, is then mechanical later.
 
 ### 5.2 Every change is an Edit
 
@@ -169,7 +192,7 @@ primitive gives, for free:
 
 ### 5.3 Positions
 
-**OPEN, recommendation:** the core works in **byte offsets into UTF-8** (Go strings,
+**Agreed (2026-11-21):** the core works in **byte offsets into UTF-8** (Go strings,
 tree-sitter's unit, no conversion on every edit). Cursor movement steps by **grapheme
 cluster** (`l` over `é` written as `e` + combining accent is one step; an emoji with a
 skin-tone modifier is one step). Columns for `j`/`k` (vim's "virtual column") use display
@@ -188,9 +211,9 @@ program, kilobytes not megabytes; a rope or piece table is premature (benchmarks
 
 `Feed(keys...) → events`. No goroutines, no timers. Anything time-based (an `esc` that may
 be the start of an alt sequence, a `jk` insert-mode escape mapping, the paste burst rule
-jqv already has) is the adapter's or host's business, or the engine is told the time
-(`Feed` takes a timestamp in a later version if mappings with timeouts earn a place,
-**OPEN**). The same key sequence always gives the same result, which is what makes case
+jqv already has) is the adapter's or host's business. **Agreed (2026-11-21):** no time in the engine;
+if mappings with timeouts earn a place (V-016), `Feed` would take a timestamp, decided
+then. The same key sequence always gives the same result, which is what makes case
 files and fuzzing work.
 
 ## 6. The API (sketch, not settled)
@@ -204,6 +227,7 @@ ed := vid.New(vid.Options{
     Hooks:   myHooks,               // any of the optional interfaces below
 })
 ed.SetText("select(.age > 3)", 7)      // text and cursor
+ed.SetViewport(0, 12)                  // visible lines, for H M L, ctrl+d, zz, jump labels
 evs := ed.Feed(key.MustParse("ciwname<Esc>")...)
 st := ed.State()
 // st.Text, st.Cursor, st.Mode, st.Selection, st.Pending ("d2" while a command is half typed),
@@ -238,6 +262,7 @@ jqv moves over without losing anything:
 | `Words` | what a word is (`$ENV`, `@csv` are words in jq; `-Path` in pwsh) | `WordAt`'s isWord |
 | `Clipboard` | the `+` and `*` registers | (atotto/clipboard in jqv) |
 | `Editor` | `vv`: hand the text to an external editor and take it back | — |
+| `Formatter`, `Definitions`, `Symbols`, `Diagnostics` | language services (§15) | (jqv's format, defs, checks) |
 
 A host action (`jqv.help` on F1, `jqv.layout` on F8) is a keymap entry naming the action;
 vid emits `HostAction`, and the host may hand back a rewrite (`ed.Apply(edit)`), which goes
@@ -291,7 +316,8 @@ vid edit                               # read text on stdin, edit it, write it o
 
 The interactive host shows: the buffer, the mode, the pending command (`"a2d`), the
 registers on a key, and an event log pane on demand, so a surprise can be turned straight
-into a case file (`ctrl+s` in the smoke host writes the session out as one, **OPEN** key).
+into a case file (F9 in the smoke host writes the session out as one; not ctrl+s, which is
+Zellij's scroll mode).
 
 ## 8. Testing
 
@@ -305,27 +331,28 @@ should follow. Plain text, one file per area, readable without Go:
 
 ```
 # dw from the middle of a word deletes to the start of the next
-text:  foo b|ar baz
+text:  foo b‸ar baz
 keys:  dw
-want:  foo b|baz
+want:  foo b‸baz
 reg:   "  ar␠
 
 # a count on both sides multiplies
-text:  |a b c d e f g
+text:  ‸a b c d e f g
 keys:  2d2w
-want:  |e f g
+want:  ‸e f g
 
 # ciw on whitespace changes the whitespace (vim's rule)
-text:  foo |   bar
+text:  foo ‸   bar
 keys:  ciwX<Esc>
-want:  foo|Xbar
+want:  foo‸Xbar
 mode:  normal
 ```
 
-- `|` marks the cursor: before the character it's on in normal mode, the insertion point in
+- `‸` marks the cursor: before the character it's on in normal mode, the insertion point in
   insert mode. Visual selections are `‹…›`. Multi-line text uses an indented block.
-  **OPEN:** exact markers (they must never collide with test text; a `--marker` override
-  per case).
+  **Agreed (2026-11-21):** not `|`, which jq and pwsh text is full of. A file may override
+  with `marker:`. Typing `‸` is rarely needed: most cases come from `-update` or the smoke
+  host's F9.
 - Optional lines: `mode:`, `reg:`, `msg:`, `events:`, `profile:`, `keymap:`.
 - Tags: `# oracle: skip — why` for cases where vid deliberately differs from vim (all of
   them listed in §9), `# psreadline` for cases that pin a PSReadLine behaviour.
@@ -337,10 +364,23 @@ mode:  normal
 ### 8.2 The oracle: nvim headless
 
 jqv checks its filter stack against gojq *and* real jq when it's on PATH. vid does the same
-with nvim: each case (not tagged `oracle: skip`) is also run through
-`nvim --headless --clean -u NONE` with the text loaded, the keys fed, and the buffer,
-cursor, mode and registers read back. A disagreement fails the test with both results.
-Without nvim the oracle tests skip; CI installs it. This keeps "behaves exactly as vim"
+with nvim: each case (not tagged `oracle: skip`) is also run through nvim with the text
+loaded, the keys fed, and the buffer, cursor, mode and registers read back. A disagreement
+fails the test with both results. Without nvim the oracle tests skip; CI installs it.
+
+**Agreed (2026-11-21):**
+
+- **"vim's behaviour" means nvim's defaults** (0.12 on the owner's machine), as `--clean`
+  gives them: `Y` is `y$`, `nostartofline`, `nojoinspaces`, and so on. vid follows those.
+- **One `nvim --embed --clean` per test run**, driven over msgpack-RPC, buffer reset between
+  cases; not a process per case. It lives in its own module (`oracle`) so the core's
+  `go.mod` never carries the RPC client.
+- **The owner's own config and plugins never matter**: the oracle always starts clean.
+- **Extensions are checked against the plugin they come from** (§14.3): the case file names
+  a plugin pinned at a commit, and the oracle loads that one plugin through a tiny init file,
+  nothing else.
+
+Without nvim the oracle tests skip, as before. This keeps "behaves exactly as vim"
 honest without anyone remembering vim's corner cases (`cw` on a word acting as `ce`,
 `dw` at the end of a line not joining, `yiw` cursor placement, exclusive motions turning
 inclusive across lines…).
@@ -390,7 +430,11 @@ Every one is tagged in its case file (`oracle: skip`), with the reason:
 - Line profile `j`/`k`/`/` reach history (§6.3).
 - Enter in the line profile accepts.
 - `v` / `vv` (§6.3).
+- Enter, `o` and the pwsh line host's multi-line rules (§16.3), once agreed.
 - *(to be grown, never silently)*
+
+Behaviour where vid matches nvim but not classic vim (`Y`) is not a difference: nvim is
+the reference (§8.2).
 
 ## 10. Syntax: an interface first, tree-sitter as one provider
 
@@ -410,25 +454,30 @@ runtime so the "no cgo" rule holds. See [RESEARCH.md](RESEARCH.md) §1.
 
 ## 11. Order of work, each step useful alone
 
-0. **These documents**, agreed with the owner. Then two spikes: the case-file format with
-   the nvim oracle driving three cases end to end, and the `key` notation against every key
-   Bubble Tea v1 sends on Windows Terminal and Zellij (jqv's key spike already found shift+
-   enter and ctrl+enter arrive as `enter` there).
+0. **These documents**, agreed with the owner. Then three spikes: the case-file format with
+   the nvim oracle (`--embed`) driving three cases end to end; the `key` notation against
+   every key Bubble Tea v1 sends on Windows Terminal and Zellij (jqv's key spike already
+   found shift+enter and ctrl+enter arrive as `enter` there); and **the pwsh line host**
+   (§16.4), with a stub editor, because it is the part most likely to change the API.
 1. **`text`, `key`, motions** (`h l w b e W B E 0 ^ $ f F t T ; , %`), `vid run`, case
    files, oracle. No modes yet beyond normal.
 2. **The grammar:** counts, `d c y`, `x X s S D C Y`, `p P`, `r ~ J`, registers, undo,
    redo, dot-repeat; insert mode with the shell insert keys (ctrl+w, ctrl+u, ctrl+h).
 3. **Many lines and profiles:** `j k gg G o O + -`, linewise operators (`dd`, `dj`, `yy`),
    history at the edges, accept/continue.
-4. **Visual mode** (`v`, `V`) and **text objects** (words, quotes, brackets, paragraphs).
+4. **Visual mode** (`v`, `V`) and **text objects** (words, quotes, brackets, paragraphs),
+   registered through the extension API (§14), which is shaped here by real use.
 5. **The interactive smoke host** and the Bubble Tea v1 adapter; `vid keys`, `vid bindings`.
    *PSReadLine parity reached here* ([PARITY.md](PARITY.md)).
 6. **jqv integration** behind `[editor] mode = "vi"` (jqv Q-051): jqv's hooks through the
-   adapter, its F-keys as host actions, the mode in its prompt.
-7. **Beyond the shells:** surround (`cs ds ys`, zsh-vi-mode's), `ctrl+a`/`ctrl+x`
-   increment, `gu gU g~`; then the syntax interface with `jqsyntax`, then tree-sitter.
-8. **Shell hosting research:** `vid edit` behind a pwsh key; then the
-   `PSConsoleHostReadLine` experiment ([RESEARCH.md](RESEARCH.md) §2).
+   adapter, its F-keys as host actions, the mode in its prompt. Then **the code pane**
+   (jqv Q-049 → T-029) on the buffer profile: viewport and scrolling, buffer search, and
+   the language services (§15) — format, `gd`, symbols, diagnostics, the jumplist.
+7. **Beyond the shells, as extensions** (§14): surround (`cs ds ys`), jump labels;
+   `ctrl+a`/`ctrl+x` increment and `gu gU g~` in the core; then the syntax interface with
+   `jqsyntax`, syntax text objects and incremental selection, then tree-sitter.
+8. **The pwsh line host** (§16): `vid serve`, the pwsh module, a pwsh lexer for colour,
+   the multi-line feel tried and then agreed.
 
 ## 12. Tech choices
 
@@ -446,3 +495,165 @@ Zellij, tmux and Windows Terminal take first (jqv DESIGN §5, hit DESIGN §14.1)
 mode no ctrl+b, ctrl+p/ctrl+n (Zellij modes; PSReadLine's vi insert mode doesn't bind them
 either), alt+f, alt+arrows; ctrl+s (Zellij scroll) left alone. Normal mode is mostly plain
 letters and is safe. `vid keys` shows what actually arrives, before anyone argues.
+
+## 14. Extensions
+
+**Agreed (2026-11-21):** the good ideas in nvim plugins (surround, jump labels, more text
+objects, treesitter text objects) come to vid as Go ports of the *idea*, never as loaded
+code. They are not buried in the engine: each is encapsulated, tested on its own, and
+switched on or off by the host, so they can grow and be fixed over time without touching
+the core.
+
+### 14.1 The line between core and extension
+
+**Core is what `nvim --clean` does; anything nvim needs a plugin for is an extension.** The
+oracle can check that rule mechanically. So `iw`, `i"`, `gc` (built into nvim since 0.10,
+with the host's comment string), `]d`/`[d` and `ctrl+a` are core; surround, jump labels,
+argument text objects and syntax text objects are extensions.
+
+### 14.2 What an extension is
+
+A package under `ext/` (`ext/surround`, `ext/jump`, …) with a value implementing
+`vid.Extension`: a name and an `Install(*vid.Registry)`. Through the registry it adds
+named **motions**, **text objects**, **operators** and **actions**, proposes **default
+bindings**, and may contribute **spans** to state (jump labels). Its functions get a narrow
+context: the text, cursor, viewport, registers, the syntax tree if the host gave one, and a
+way to submit edits — which go through the same undo, dot-repeat and `Changed` machinery as
+everything else. They never see the engine's internals.
+
+The engine is fed keys and never blocks, so an extension that needs more keys (`ys` + a
+motion + a character, a jump label) returns a continuation, and the engine holds it as
+pending state; `st.Pending` shows it like any half-typed command. An extension's motion is
+a motion everywhere: `d` + a jump label works, `.` repeats `ysiw"`.
+
+The engine's own text objects register through the same API, always installed. That keeps
+the API shaped by real use from step 4 rather than designed in the abstract.
+
+### 14.3 On, off, and clashes
+
+`Options.Extensions` lists what is installed; an extension not listed costs nothing and
+binds nothing. Its bindings are defaults: the host's keymap may move or remove them. Two
+installed extensions proposing the same key is an error from `vid.New`, not a silent
+winner, unless the host's keymap settles it.
+
+### 14.4 Testing each one on its own
+
+- Each extension has its own `testdata/cases/`; a case's `ext:` line says what `vidtest`
+  installs, and nothing else is.
+- Core cases run with **no** extensions, so no extension can change core behaviour; a
+  second run with **all** of them installed checks they don't clash and leave unbound keys
+  alone.
+- **Oracle against the source plugin:** a case file names it
+  (`oracle: nvim-surround@<commit>`), pins live in `oracle/plugins.lock`, a script fetches
+  them into a cache, and the oracle loads that one plugin through a tiny init file. No
+  cache, no oracle run; the cases still run. Where we differ from the plugin,
+  `oracle: skip` with the reason, as for vim.
+- Some extensions have no meaningful oracle (labels depend on the screen); they have cases
+  only.
+
+### 14.5 Inside the project
+
+The API is public, so anyone *could* write one, but it is not promised stable before 1.0,
+and our extensions live in this repository. Each package's doc names its source (plugin,
+version), what was taken and what was left out.
+
+Candidates (WISHLIST V-017 onward): surround (vim-surround's classic keys), jump labels
+(flash.nvim / leap), extra text objects (mini.ai: arguments, function calls, heuristically
+without a tree), syntax text objects and incremental selection
+(nvim-treesitter-textobjects, on `syntax.Tree`).
+
+## 15. Language services: the basics, done well
+
+**Agreed (2026-11-21):** jqv's code pane is where vid comes closest to a "mini nvim": a
+small, scrollable buffer where you think *I'm in vi* and edit, move and use a few
+LSP-style features. vid hosts no language server. It defines small hooks; the host answers
+from what it already knows (jqv from `jqsyntax`, its checks, its formatter), and vid gives
+them vi's keys and vi's undo.
+
+| Feature | Keys (nvim's defaults where it has them) | Hook | Notes |
+|---|---|---|---|
+| Format | `=` operator (`==`, `=ip`, `gg=G`); `gq` | `Formatter.Format(text, from, to) → edits` | One undo step; the cursor carried through the edit |
+| Go to definition | `gd` | `Definitions.Definition(text, pos) → []Location` | In-buffer jumps by vid; another unit is a host action |
+| Symbols | a host picker over `Symbols(text)`; `[[` `]]` to the previous / next symbol **OPEN** | `Symbols` | `[[` `]]` are vim's section motions: reused, tagged `oracle: skip` |
+| Diagnostics | `]d` `[d`; spans in state for the host to draw | `Diagnostics(text) → []Diagnostic` | nvim 0.10+ binds `]d` `[d` too |
+| Documentation | `K` | host action | nvim's `K` is hover under an LSP |
+| Jumplist | `ctrl+o` / `ctrl+i` | core | `gd`, symbol jumps, `G`, searches push; ctrl+i is tab in most terminals, so its key in the buffer profile is **OPEN** |
+| Completion | insert-mode Tab | `Completer` (§6.2) | as today |
+
+With them, the buffer profile needs the viewport (§3.1): `ctrl+d`/`ctrl+u`/`ctrl+e`/`ctrl+y`,
+`zz zt zb`, `H M L`, a `scrolloff`, and buffer search `/ ? n N * #`.
+
+Not at first: rename, code actions, signature help, workspace-wide anything. An LSP client
+*behind* these hooks would be a host's business (wishlist).
+
+## 16. Hosting in pwsh
+
+### 16.1 What it is for
+
+Multi-line editing in pwsh has friction today: PSReadLine's multi-line is awkward, and
+handing the line to nvim (with the owner's plugins) is slow to start and a context switch.
+VS Code is the right place for a 20-line script and its debugger, and vid does not compete
+with it. The target is **the complex statement**: a pipeline you want split over lines,
+edited properly, and run — first-class, inside the shell.
+
+Users: vi-mode users who want vid in place of PSReadLine. Nobody else.
+
+### 16.2 Shape (agreed 2026-11-21: hit's resident pattern)
+
+```
+pwsh ── PSConsoleHostReadLine (vid module) ──── named pipe ──── vid serve (Go, resident)
+          loops serving requests:                               owns console input and
+          complete  → TabExpansion2                             drawing for one ReadLine;
+          complete? → Parser.ParseInput                         keys never cross the pipe
+          history, then accepted / cancelled
+```
+
+- **`vid serve`** is a child of the shell, as `hit serve` is (hit DESIGN §16): the parent
+  pinned by an open handle, an idle exit, a pipe whose DACL is the user's SID, stopped by a
+  new install, started again on demand.
+- **During a ReadLine it owns the console**: raw input, drawing from the prompt's position,
+  restoring the console mode on exit or crash. Every key is handled inside one Go process.
+- **pwsh is asked only what only pwsh knows**, and only on Tab (completion) and Enter (is
+  the input complete?). Milliseconds per round trip are fine at that rate.
+- **Colour is computed in Go**, from a pwsh lexer (hand-written and tolerant, as jqsyntax
+  is, or tree-sitter-powershell: S-006); pwsh's tokenizer per key over a pipe would be too
+  slow.
+- **History** in PSReadLine's history file format, so switching back and forth loses
+  nothing; hit's history core (hit C-044) may serve.
+- **Every failure falls back to PSReadLine's own ReadLine.** No server, a wedged pipe, a
+  crash: the shell always gets a line editor.
+
+### 16.3 The multi-line feel (proposal, to be tried before it is agreed)
+
+- The buffer grows inline under the prompt, with a continuation gutter; soft wrap and
+  resize handled by `render`.
+- **Enter in insert mode** accepts if pwsh's parser says the input is complete, otherwise
+  breaks the line. **Enter in normal mode** always accepts.
+- **`o` / `O` are the dependable new line**: shift+enter doesn't survive Windows Terminal or
+  Zellij (jqv's key spike), and vi already has the answer.
+- `k` / `j` move between lines, then into history; a history entry is a whole multi-line
+  unit (as hit S-009 does inside PSReadLine).
+- **A "room" key** grows the inline region into a tall pane for the same editor and buffer,
+  and collapses on accept: the answer to `vv` without another process. Key **OPEN**.
+
+The smoke host can carry this with a fake `Acceptor` early, so the owner can try the feel
+long before the pwsh host exists (H-014).
+
+### 16.4 The spike first (§11 step 0)
+
+A stub `vid serve` (insert mode, a few keys, no vi grammar yet) behind
+`PSConsoleHostReadLine`, in Windows Terminal and Zellij. **Settles it:**
+
+- per-key latency and the console handover (raw mode, ctrl+c, restoring after a kill);
+- the prompt's position and width, multi-line drawing, resize;
+- one Tab completion round trip through `TabExpansion2`, timed on the work machine;
+- the fallback to PSReadLine when the server is missing or wedged;
+- how hit's own keys (its Ctrl+R and Up search are PSReadLine handlers today) reach hit
+  from inside vid: host actions that call hit's server, most likely. **OPEN.**
+
+### 16.5 Not doing
+
+- A replacement for non-vi users, or `Set-PSReadLineKeyHandler` compatibility.
+- Predictions, at first (the predictor API can be called later).
+- The VS Code integrated console or the ISE.
+- zsh (RESEARCH §2.3; parked until a Linux user asks).

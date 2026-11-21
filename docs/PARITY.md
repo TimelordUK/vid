@@ -44,7 +44,8 @@ side (DESIGN §7).
 | `y` + motion | yes, fixed chords (`yw yb y$ y0 y^ yy y% yh yl yW yB ye yE`) | yes | grammar | 2 |
 | counts (`3dw`, `d3w`, `2d2w`) | `DigitArgument` | yes | yes, multiplied as vim | 2 |
 | `x` `X` `s` `S` `D` `C` | yes | yes | yes | 2 |
-| `Y` | no | yes | yes (vim's: line; nvim's `y$` is **OPEN**) | 2 |
+| `Y` | no | yes | yes, nvim's `y$` (agreed 2026-11-21: nvim is the reference) | 2 |
+| `gc` `gcc` (comment) | no | — | yes, as nvim 0.10+, comment string from the host | 4 |
 | `p` `P` | yes | yes | yes, charwise and linewise | 2 |
 | `r` `R` | yes (`ReplaceCharInPlace`, `ViReplaceUntilEsc`) | yes | yes | 2 |
 | `~` | yes (`InvertCase`) | yes | yes | 2 |
@@ -87,7 +88,7 @@ side (DESIGN §7).
 
 | Keys | PSReadLine 2.3.6 | zsh-vi-mode | vid | Step |
 |---|---|---|---|---|
-| `cs"'` `ds"` `ys{motion}"` `S"` in visual | — | yes (classic; `s`-prefix variant) | yes, classic | 7 |
+| `cs"'` `ds"` `ys{motion}"` `S"` in visual | — | yes (classic; `s`-prefix variant) | yes, classic, as extension `ext/surround` (DESIGN §14) | 7 |
 
 ## Insert mode
 
