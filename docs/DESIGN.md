@@ -448,6 +448,16 @@ copying the text. Benchmarks are tests, and CI fails a large regression.
 GitHub Actions on `windows-latest` and `ubuntu-latest`: gofmt check, `go vet`, `go test`
 (with the nvim oracle), a short fuzz pass. `./scripts/test.ps1` runs what CI runs.
 
+Built 2026-11-22 (Q-006):
+
+- `go test` runs in both modules: the root and `oracle`, which `./...` from the root does
+  not reach.
+- **nvim is pinned** (`rhysd/action-setup-vim`, v0.12.6): the reference is nvim's
+  defaults, so a new nvim is a deliberate bump with a re-bless, never a surprise.
+- **CI cannot skip the oracle**: `VID_REQUIRE_NVIM` (`test.ps1 -RequireNvim`) turns
+  "nvim not on PATH" from a skip into a failure. Locally it still skips.
+- `.gitattributes` keeps LF everywhere, so a bless on Windows doesn't rewrite every line.
+
 ## 9. Deliberate differences from vim
 
 Every one is tagged in its case file (`oracle: skip`), with the reason:

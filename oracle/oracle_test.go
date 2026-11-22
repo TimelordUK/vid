@@ -3,6 +3,7 @@ package oracle
 import (
 	"errors"
 	"flag"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,6 +19,9 @@ var bless = flag.Bool("bless", false,
 func TestSpecAgainstNvim(t *testing.T) {
 	nv, err := Start()
 	if errors.Is(err, ErrNoNvim) {
+		if os.Getenv("VID_REQUIRE_NVIM") != "" {
+			t.Fatal("nvim not on PATH and VID_REQUIRE_NVIM is set: CI must not skip the oracle")
+		}
 		t.Skip("nvim not on PATH: the oracle is skipped")
 	}
 	if err != nil {

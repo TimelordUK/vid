@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            oracle/go.sum
+
+      # The oracle's reference is nvim's defaults (DESIGN §8.2): pinned, bumped on purpose.
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: v0.12.6
+
+      - name: gofmt, vet, test, oracle, fuzz (10s per target)
+        run: ./scripts/test.ps1 -Fuzz 10 -RequireNvim

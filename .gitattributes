@@ -1,0 +1,4 @@
+# LF everywhere: case files are rewritten by -bless/-update with \n, so a CRLF checkout
+# would show every line as changed.
+* text=auto eol=lf
+*.ps1 text eol=lf
