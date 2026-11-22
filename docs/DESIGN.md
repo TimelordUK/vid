@@ -200,7 +200,9 @@ width, from a host-overridable `Width(string) int` (uniseg by default; East Asia
 characters are two). `text` offers rune ↔ byte conversion; jqv's editor works in runes
 today, so its adapter converts at the seam.
 
-The buffer holds `\n` only. Hosts normalise `\r\n` on the way in and out (pwsh's PSReadLine
+The buffer always holds valid UTF-8: invalid bytes become U+FFFD on the way in, and an
+edit's text must be valid, so every offset is on a rune boundary (the first fuzz run found
+an inverse edit failing without this, 2026-11-22). It holds `\n` only. Hosts normalise `\r\n` on the way in and out (pwsh's PSReadLine
 buffer is already `\n`).
 
 Storage: a plain string plus a line-start index. Buffers here are a shell line or a
@@ -375,6 +377,10 @@ mode:  normal
   them listed in §9), `# psreadline` for cases that pin a PSReadLine behaviour.
 - `go test ./... -update` re-blesses `want:` lines from the engine; review the diff before
   committing, as in jqv.
+- **The spec may run ahead of the engine** (agreed 2026-11-22): the engine runner reports a
+  case whose keys vid does not handle yet as skipped (unsupported), not failed, and prints
+  the count. The oracle still checks every case, so the spec stays right while the engine
+  catches up, and the skip count is the progress bar.
 - `vidtest` runs them, so jqv's tests can carry case files of their own with jq-specific
   word rules and hooks.
 
@@ -513,6 +519,12 @@ runtime so the "no cgo" rule holds. See [RESEARCH.md](RESEARCH.md) §1.
    `jqsyntax`, syntax text objects and incremental selection, then tree-sitter.
 8. **The pwsh line host** (§16): `vid serve`, the pwsh module, a pwsh lexer for colour,
    the multi-line feel tried and then agreed.
+
+**Agreed (2026-11-22):** the mechanics come first: steps 1 and 2 before the step-0 spikes
+for keys (Q-004) and the pwsh line host (H-012). Since text, keys and motions don't depend
+on the API those spikes might change, the spikes are due before step 2 fixes `Feed`, events
+and hooks. A **minimal smoke host** (H-018) lands as soon as there is a cursor to move, ahead
+of step 5's full one, so the owner can try each piece as it is built.
 
 ## 12. Tech choices
 
