@@ -64,18 +64,27 @@ func Format(cases []*Case) string {
 			w.WriteString("\n")
 		}
 		for _, cm := range c.Comments {
-			w.WriteString("# " + cm + "\n")
+			w.WriteString("# ")
+			w.WriteString(cm)
+			w.WriteString("\n")
 		}
 		writeBuf(&w, "text", c.Text)
-		w.WriteString("keys:  " + c.Keys + "\n")
+		keys := strings.ReplaceAll(c.Keys, "\n", "␤")
+		w.WriteString("keys:  ")
+		w.WriteString(escapeEnds(keys))
+		w.WriteString("\n")
 		if c.HasWant {
 			writeBuf(&w, "want", c.Want)
 		}
 		if c.Mode != "" {
-			w.WriteString("mode:  " + c.Mode + "\n")
+			w.WriteString("mode:  ")
+			w.WriteString(c.Mode)
+			w.WriteString("\n")
 		}
 		for _, r := range c.Regs {
-			w.WriteString("reg:   " + FormatReg(r) + "\n")
+			w.WriteString("reg:   ")
+			w.WriteString(FormatReg(r))
+			w.WriteString("\n")
 		}
 	}
 	return w.String()
