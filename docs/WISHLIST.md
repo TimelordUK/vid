@@ -12,8 +12,8 @@ Step = DESIGN §11. Status: `idea` · `planned` · `doing` · `done` · `dropped
 
 | ID | What | Step | Status |
 |---|---|---|---|
-| C-001 | `text.Buffer`: a string and a line index; every change an `Edit{From, To, Text}` (DESIGN §5.2) | 1 | planned |
-| C-002 | Positions in bytes, movement by grapheme, columns by display width with a host `Width` (DESIGN §5.3); agreed 2026-11-21 | 1 | planned |
+| C-001 | `text.Buffer`: a string and a line index; every change an `Edit{From, To, Text}` (DESIGN §5.2). Built 2026-11-22: incremental line index, inverse edits, always valid UTF-8, fuzzed | 1 | done |
+| C-002 | Positions in bytes, movement by grapheme, columns by display width with a host `Width` (DESIGN §5.3); agreed 2026-11-21. Built 2026-11-22: `NextGrapheme`/`PrevGrapheme`, `Column`/`AtColumn` with tabstop, rune ↔ byte; fuzzed against uniseg | 1 | done |
 | C-003 | `Editor`: `Feed(keys) → events`, `State()`, `SetText`, `Apply(edit)` for host rewrites (DESIGN §6.1) | 2 | planned |
 | C-004 | Registers: unnamed, `0`, `1`–`9`, `-`, `a`–`z`/`A`–`Z`, `_`, `+`/`*` through the Clipboard hook; shareable between editors (DESIGN §6.4) | 2 | planned |
 | C-005 | Undo grouped as vim's, cursor restored with the step; PSReadLine's `U` undo-all (DESIGN §6.5) | 2 | planned |
@@ -76,6 +76,7 @@ Step = DESIGN §11. Status: `idea` · `planned` · `doing` · `done` · `dropped
 | H-015 | The room key: the inline region grows into a tall pane for the same buffer, collapses on accept; key **OPEN** (DESIGN §16.3) | 8 | idea |
 | H-016 | hit's keys (Ctrl+R, Up search) reachable inside the pwsh host, probably host actions calling `hit serve` (DESIGN §16.4) | 8 | idea |
 | H-017 | An LSP client behind the language-service hooks, as a host's adapter (DESIGN §15) | — | idea |
+| H-018 | Minimal interactive smoke host, early: the buffer, cursor, mode and pending keys in a raw terminal, so the owner can try each piece while it's built; grows into H-002 (DESIGN §11) | 1 | planned |
 
 ## Syntax
 
@@ -92,7 +93,7 @@ Step = DESIGN §11. Status: `idea` · `planned` · `doing` · `done` · `dropped
 
 | ID | What | Step | Status |
 |---|---|---|---|
-| Q-001 | Case-file format and runner (`vidtest`), `-update` to re-bless (DESIGN §8.1). Format, parser, canonical writer done 2026-11-21; the engine runner waits for an engine | 0 | doing |
+| Q-001 | Case-file format and runner (`vidtest`), `-update` to re-bless (DESIGN §8.1). Format, parser, canonical writer done 2026-11-21; the engine runner waits for an engine, and reports cases with keys vid does not handle yet as skipped (agreed 2026-11-22) | 0 | doing |
 | Q-002 | nvim oracle over the case files: one `nvim --embed --clean` per run over msgpack-RPC, in its own module; nvim's defaults are the reference; skips without nvim, CI installs it (DESIGN §8.2). Built 2026-11-21 with `-bless`; in CI with Q-006 | 0 | doing |
 | Q-003 | Engine fuzz: no panics, valid cursor, undo/redo and dot-repeat properties | 2 | planned |
 | Q-004 | Key spike: every key Bubble Tea v1 sends on Windows Terminal and Zellij parses, and what esc costs | 0 | planned |

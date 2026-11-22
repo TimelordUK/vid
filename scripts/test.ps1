@@ -29,7 +29,10 @@ try {
 
     if ($Fuzz -gt 0) {
         # @('./pkg', 'FuzzName') per target, as they land (Q-003, V-001, C-001)
-        $targets = @()
+        $targets = @(
+            @('./text', 'FuzzApply'),
+            @('./text', 'FuzzGraphemes')
+        )
         foreach ($t in $targets) {
             go test $t[0] -run '^$' -fuzz "^$($t[1])$" -fuzztime "$($Fuzz)s"
             if ($LASTEXITCODE) { throw "fuzz $($t[1]) failed" }
