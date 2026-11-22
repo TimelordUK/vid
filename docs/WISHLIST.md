@@ -97,7 +97,7 @@ Step = DESIGN §11. Status: `idea` · `planned` · `doing` · `done` · `dropped
 | Q-003 | Engine fuzz: no panics, valid cursor, undo/redo and dot-repeat properties | 2 | planned |
 | Q-004 | Key spike: every key Bubble Tea v1 sends on Windows Terminal and Zellij parses, and what esc costs | 0 | planned |
 | Q-005 | Benchmarks and the per-key budget (DESIGN §8.5) | 2 | planned |
-| Q-006 | CI on Windows and Linux; `scripts/test.ps1` runs the same. Built 2026-11-22: both modules, nvim pinned at v0.12.6, `VID_REQUIRE_NVIM` makes a missing nvim fail instead of skip; done once green on GitHub | 1 | doing |
+| Q-006 | CI on Windows and Linux; `scripts/test.ps1` runs the same. Built 2026-11-22: both modules, nvim pinned at v0.12.6, `VID_REQUIRE_NVIM` makes a missing nvim fail instead of skip; green on GitHub 2026-11-22 | 1 | done |
 | Q-007 | Re-dump PSReadLine's bindings on each PSReadLine release and diff against PARITY.md | — | idea |
 | Q-008 | Plugin oracle: `oracle/plugins.lock` pins source plugins at a commit, a script fetches them, a case names its plugin and the oracle loads only that one (DESIGN §14.4) | 7 | idea |
 | Q-009 | Extension isolation: core cases with no extensions installed, a second run with all of them; each extension's own cases with only itself (DESIGN §14.4) | 4 | planned |
